@@ -1,9 +1,12 @@
 import { createServer } from "node:http";
 import { loadConfig } from "./config.js";
 import { joinAsAgent, type RunningAgent } from "./agent.js";
+import { readSession } from "./sinks/walk-session.js";
 
 const cfg = loadConfig();
 const agents = new Map<string, RunningAgent>();
+
+const ROOM_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{2,63}$/;
 
 const server = createServer(async (req, res) => {
   if (req.method === "GET" && req.url === "/healthz") {
@@ -12,10 +15,23 @@ const server = createServer(async (req, res) => {
     return;
   }
 
+  if (req.method === "GET" && req.url?.startsWith("/sessions/")) {
+    const room = decodeURIComponent(req.url.slice("/sessions/".length));
+    if (!ROOM_RE.test(room)) {
+      res.writeHead(400, { "content-type": "application/json" });
+      res.end(JSON.stringify({ error: "invalid_room" }));
+      return;
+    }
+    const observations = await readSession(room);
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(JSON.stringify({ room, observations }));
+    return;
+  }
+
   if (req.method === "POST" && req.url === "/spawn") {
     const body = await readJson(req);
     const room = typeof body?.room === "string" ? body.room : "";
-    if (!/^[A-Za-z0-9][A-Za-z0-9_-]{2,63}$/.test(room)) {
+    if (!ROOM_RE.test(room)) {
       res.writeHead(400, { "content-type": "application/json" });
       res.end(JSON.stringify({ error: "invalid_room" }));
       return;
