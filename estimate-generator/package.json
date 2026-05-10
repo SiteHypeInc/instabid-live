@@ -9,7 +9,9 @@
     "build": "tsc -p tsconfig.json",
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "smoke": "tsx test/smoke.ts",
+    "smoke:offline": "tsx test/smoke.ts --offline"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",

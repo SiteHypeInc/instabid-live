@@ -1,0 +1,25 @@
+{
+  "sessionId": "ws_demo_kitchen_counters_001",
+  "trade": "kitchen-countertops",
+  "zip": "30303",
+  "transcript": [
+    { "speaker": "contractor", "text": "Walking the kitchen with Ms. Smith now. L-shaped layout, perimeter run plus a 4-foot island.", "at": "2026-05-10T14:01:55Z" },
+    { "speaker": "contractor", "text": "Measuring perimeter — about 28 linear feet.", "at": "2026-05-10T14:02:11Z" },
+    { "speaker": "contractor", "text": "Island runs 8 LF. So 36 LF total run, give or take.", "at": "2026-05-10T14:02:40Z" },
+    { "speaker": "homeowner", "text": "We're thinking quartz, mid-grade, white-grey family. Nothing too veined.", "at": "2026-05-10T14:03:05Z" },
+    { "speaker": "contractor", "text": "Got it. Tear-out of the existing laminate is included. Sink stays — undermount cutout. Cooktop also stays — one cutout.", "at": "2026-05-10T14:03:30Z" },
+    { "speaker": "contractor", "text": "Standard 4-inch quartz backsplash, looks like ~22 LF.", "at": "2026-05-10T14:04:45Z" },
+    { "speaker": "homeowner", "text": "Can you email me the estimate today?", "at": "2026-05-10T14:05:30Z" }
+  ],
+  "observations": [
+    { "kind": "dimension", "text": "Perimeter run measured at 28 LF", "confidence": 0.9 },
+    { "kind": "dimension", "text": "Island run measured at 8 LF", "confidence": 0.9 },
+    { "kind": "material", "text": "Mid-grade quartz, white/grey color family", "confidence": 0.85 },
+    { "kind": "condition", "text": "Existing laminate to be torn out", "confidence": 0.95 },
+    { "kind": "fixture", "text": "Existing undermount sink reused — 1 cutout needed", "confidence": 0.9 },
+    { "kind": "fixture", "text": "Existing cooktop reused — 1 cutout needed", "confidence": 0.9 },
+    { "kind": "dimension", "text": "4-inch quartz backsplash, ~22 LF", "confidence": 0.8 },
+    { "kind": "note", "text": "First-floor easy access, no stair/elevator concerns", "confidence": 0.95 }
+  ],
+  "hardCase": false
+}

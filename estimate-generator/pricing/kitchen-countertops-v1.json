@@ -1,0 +1,91 @@
+{
+  "_version": "1.0.0",
+  "_trade": "kitchen-countertops",
+  "_note": "Static pricing DB v1.0 for kitchen counter estimates. USD per square foot installed unless otherwise noted. Regional multipliers calibrated against 2026 trade data. Numbers are unit-priced — Claude is responsible for quantity and SKU selection from observations.",
+  "regions": {
+    "northeast": {
+      "states": ["NY", "NJ", "MA", "CT", "PA", "MD", "VA", "DE", "RI", "NH", "VT", "ME", "DC"],
+      "zip_prefixes": ["0", "1", "2"],
+      "labor_multiplier": 1.20,
+      "notes": "Higher cost labor market; metro NYC/Boston run higher still"
+    },
+    "southeast": {
+      "states": ["FL", "GA", "AL", "SC", "NC", "TN", "MS", "AR", "LA"],
+      "zip_prefixes": ["3"],
+      "labor_multiplier": 0.95,
+      "notes": "Mid-low labor market"
+    },
+    "midwest": {
+      "states": ["OH", "IL", "IN", "MI", "MO", "WI", "MN", "IA", "KS", "NE", "ND", "SD"],
+      "zip_prefixes": ["4", "5", "6"],
+      "labor_multiplier": 1.00,
+      "notes": "Mid-range labor market (baseline)"
+    },
+    "west": {
+      "states": ["CA", "OR", "WA", "AZ", "CO", "NV", "UT", "NM", "ID", "MT", "WY", "AK", "HI"],
+      "zip_prefixes": ["7", "8", "9"],
+      "labor_multiplier": 1.30,
+      "notes": "West coast premium — CA/OR/WA highest in nation"
+    }
+  },
+  "materials": {
+    "laminate": {
+      "label": "Laminate",
+      "material_per_sqft": 25,
+      "edge_options": ["square", "beveled"]
+    },
+    "butcher_block": {
+      "label": "Butcher block (hardwood)",
+      "material_per_sqft": 55,
+      "edge_options": ["square", "eased"]
+    },
+    "quartz_entry": {
+      "label": "Quartz, entry-grade",
+      "material_per_sqft": 50,
+      "edge_options": ["eased", "beveled"]
+    },
+    "quartz_mid": {
+      "label": "Quartz, mid-grade (typical white/grey)",
+      "material_per_sqft": 65,
+      "edge_options": ["eased", "beveled", "ogee"],
+      "default": true
+    },
+    "quartz_premium": {
+      "label": "Quartz, premium (designer veining)",
+      "material_per_sqft": 95,
+      "edge_options": ["eased", "beveled", "ogee", "waterfall"]
+    },
+    "granite_standard": {
+      "label": "Granite, standard slab",
+      "material_per_sqft": 60,
+      "edge_options": ["eased", "beveled", "ogee"]
+    },
+    "granite_exotic": {
+      "label": "Granite, exotic slab",
+      "material_per_sqft": 110,
+      "edge_options": ["eased", "beveled", "ogee", "waterfall"]
+    },
+    "marble_standard": {
+      "label": "Marble, standard (Carrara-class)",
+      "material_per_sqft": 90,
+      "edge_options": ["eased", "beveled", "ogee"]
+    }
+  },
+  "labor": {
+    "fabrication_install_per_sqft": 45,
+    "tearout_laminate_per_sqft": 8,
+    "tearout_stone_per_sqft": 14,
+    "sink_cutout_undermount": 350,
+    "sink_cutout_drop_in": 150,
+    "cooktop_cutout": 85,
+    "backsplash_install_per_lf": 45,
+    "edge_upgrade_per_lf": {
+      "eased": 0,
+      "beveled": 8,
+      "ogee": 18,
+      "waterfall_per_sqft": 95
+    },
+    "delivery_flat": 250,
+    "minimum_job": 1500
+  }
+}
