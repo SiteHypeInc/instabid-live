@@ -70,8 +70,35 @@ export async function GET(req: NextRequest) {
 
   const token = await at.toJwt();
 
+  // Ask the AI Participant service to join this room ahead of the contractor.
+  // Fire-and-forget: do NOT block the token response on it.
+  if (role === "contractor" && process.env.AI_PARTICIPANT_URL) {
+    void spawnAiParticipant(process.env.AI_PARTICIPANT_URL, room);
+  }
+
   return NextResponse.json(
     { token, url: wsUrl, identity, role, room },
     { headers: { "cache-control": "no-store" } },
   );
+}
+
+async function spawnAiParticipant(baseUrl: string, room: string): Promise<void> {
+  const url = `${baseUrl.replace(/\/$/, "")}/spawn`;
+  const ctrl = new AbortController();
+  const timeout = setTimeout(() => ctrl.abort(), 2_000);
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ room }),
+      signal: ctrl.signal,
+    });
+    if (!res.ok && res.status !== 200 && res.status !== 202) {
+      console.warn(`[token] ai-participant spawn ${res.status} for room=${room}`);
+    }
+  } catch (err) {
+    console.warn(`[token] ai-participant spawn failed for room=${room}:`, err);
+  } finally {
+    clearTimeout(timeout);
+  }
 }
