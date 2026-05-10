@@ -32,3 +32,11 @@ jobs:
         run: npm run build
         env:
           NEXT_PUBLIC_LIVEKIT_URL: wss://placeholder.livekit.cloud
+
+      - name: ai-participant — install
+        working-directory: ai-participant
+        run: npm install --no-audit --no-fund
+
+      - name: ai-participant — typecheck
+        working-directory: ai-participant
+        run: npm run typecheck

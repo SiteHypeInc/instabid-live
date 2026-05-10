@@ -11,3 +11,4 @@ next-env.d.ts.tmp
 .DS_Store
 .turbo
 coverage
+ai-participant/dist

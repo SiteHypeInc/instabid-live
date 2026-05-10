@@ -1,0 +1,30 @@
+{
+  "name": "@instabid-live/ai-participant",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Gemini Live agent that joins a LiveKit room as a bot participant. Subscribes to contractor video/audio, forwards to Gemini Live, publishes responses back to the room.",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@google/genai": "^0.7.0",
+    "@livekit/rtc-node": "^0.13.0",
+    "livekit-server-sdk": "^2.8.0",
+    "ws": "^8.18.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.10",
+    "@types/ws": "^8.5.13",
+    "tsx": "^4.19.2",
+    "typescript": "^5.5.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
