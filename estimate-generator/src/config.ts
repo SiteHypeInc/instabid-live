@@ -1,11 +1,13 @@
 import { z } from "zod";
 
 const Schema = z.object({
-  ANTHROPIC_API_KEY: z.string().min(1),
+  ANTHROPIC_API_KEY: z.string().optional(),
   ANTHROPIC_MODEL_DEFAULT: z.string().default("claude-sonnet-4-6"),
   ANTHROPIC_MODEL_HARD: z.string().default("claude-opus-4-7"),
   RAILS_API_URL: z.string().url().optional(),
   RAILS_API_KEY: z.string().optional(),
+  ESTIMATE_SINK: z.enum(["local", "rails"]).optional(),
+  LOCAL_SINK_DIR: z.string().optional(),
   PORT: z.coerce.number().int().positive().default(8788),
 });
 

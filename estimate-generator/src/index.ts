@@ -2,6 +2,7 @@ import { createServer } from "node:http";
 import { loadConfig } from "./config.js";
 import { generateEstimate } from "./claude.js";
 import { GenerateRequest } from "./types.js";
+import { postEstimate } from "./sink.js";
 
 const cfg = loadConfig();
 
@@ -23,8 +24,9 @@ const server = createServer(async (req, res) => {
 
     try {
       const estimate = await generateEstimate(cfg, parsed.data);
+      const sinkResult = await postEstimate(cfg, estimate);
       res.writeHead(200, { "content-type": "application/json" });
-      res.end(JSON.stringify(estimate));
+      res.end(JSON.stringify({ estimate, sink: sinkResult }));
     } catch (err) {
       const message = err instanceof Error ? err.message : "generate_failed";
       console.error("[generate]", message);

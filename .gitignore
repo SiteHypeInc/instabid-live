@@ -13,3 +13,5 @@ next-env.d.ts.tmp
 coverage
 ai-participant/dist
 estimate-generator/dist
+estimate-generator/local-sink/*
+!estimate-generator/local-sink/.gitkeep
