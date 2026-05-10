@@ -1,0 +1,26 @@
+{
+  "name": "@instabid-live/estimate-generator",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Post-call worker. Takes a walk-session transcript + observations and asks Claude to produce an itemized kitchen-countertop estimate. Persists to Rails.",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.32.1",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.10",
+    "tsx": "^4.19.2",
+    "typescript": "^5.5.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

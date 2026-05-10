@@ -12,3 +12,4 @@ next-env.d.ts.tmp
 .turbo
 coverage
 ai-participant/dist
+estimate-generator/dist
