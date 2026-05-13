@@ -31,13 +31,19 @@ const AGENT_SAMPLE_RATE = 24_000;
 const AGENT_CHANNELS = 1;
 const AGENT_AUDIO_QUEUE_MS = 200;
 
-export async function joinAsAgent(cfg: Config, roomName: string): Promise<RunningAgent> {
+export async function joinAsAgent(
+  cfg: Config,
+  roomName: string,
+  metaOverride?: Record<string, unknown>,
+): Promise<RunningAgent> {
   const token = await mintBotToken(cfg, roomName);
   const room = new Room();
   await room.connect(cfg.LIVEKIT_URL, token, { autoSubscribe: true, dynacast: true });
   console.log(`[agent] joined room=${roomName} as ${room.localParticipant?.identity}`);
 
-  const roomMeta = parseRoomMetadata(room.metadata);
+  const roomMeta: RoomMetadata = metaOverride
+    ? { ...parseRoomMetadata(room.metadata), ...pickRoomMeta(metaOverride) }
+    : parseRoomMetadata(room.metadata);
   if (roomMeta.contractorId || roomMeta.jobName) {
     console.log(
       `[agent] room metadata contractorId=${roomMeta.contractorId ?? "-"} job=${roomMeta.jobName ?? "-"} trade=${roomMeta.trade ?? "-"}`,
@@ -114,6 +120,25 @@ export async function joinAsAgent(cfg: Config, roomName: string): Promise<Runnin
       await localTrack.close().catch(() => undefined);
       await room.disconnect();
     },
+  };
+}
+
+function pickRoomMeta(parsed: Record<string, unknown>): RoomMetadata {
+  const pick = (k: string): string | undefined =>
+    typeof parsed[k] === "string" ? (parsed[k] as string) : undefined;
+  return {
+    contractorId: pick("contractorId") ?? pick("contractor_id"),
+    contractorApiKey: pick("contractorApiKey") ?? pick("contractor_api_key") ?? pick("api_key"),
+    homeownerId: pick("homeownerId") ?? pick("homeowner_id"),
+    jobName: pick("jobName") ?? pick("job_name"),
+    trade: pick("trade"),
+    customerName: pick("customerName") ?? pick("customer_name"),
+    customerEmail: pick("customerEmail") ?? pick("customer_email"),
+    customerPhone: pick("customerPhone") ?? pick("customer_phone"),
+    propertyAddress: pick("propertyAddress") ?? pick("address"),
+    city: pick("city"),
+    state: pick("state"),
+    zipCode: pick("zipCode") ?? pick("zip"),
   };
 }
 

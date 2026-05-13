@@ -70,10 +70,16 @@ export async function GET(req: NextRequest) {
 
   const token = await at.toJwt();
 
+  // Optional contractor + customer binding the agent uses to call the real
+  // /api/estimate at end-of-call. Forwarded straight to /spawn; the agent's
+  // joinAsAgent applies these on top of (and takes precedence over) anything
+  // in room.metadata.
+  const meta = buildAgentMeta(req);
+
   // Ask the AI Participant service to join this room ahead of the contractor.
   // Fire-and-forget: do NOT block the token response on it.
   if (role === "contractor" && process.env.AI_PARTICIPANT_URL) {
-    void spawnAiParticipant(process.env.AI_PARTICIPANT_URL, room);
+    void spawnAiParticipant(process.env.AI_PARTICIPANT_URL, room, meta);
   }
 
   return NextResponse.json(
@@ -82,7 +88,39 @@ export async function GET(req: NextRequest) {
   );
 }
 
-async function spawnAiParticipant(baseUrl: string, room: string): Promise<void> {
+function buildAgentMeta(req: NextRequest): Record<string, string> {
+  const sp = req.nextUrl.searchParams;
+  const meta: Record<string, string> = {};
+  const passThrough = [
+    "contractorApiKey",
+    "contractorId",
+    "homeownerId",
+    "jobName",
+    "trade",
+    "customerName",
+    "customerEmail",
+    "customerPhone",
+    "propertyAddress",
+    "city",
+    "state",
+    "zipCode",
+  ];
+  for (const k of passThrough) {
+    const v = sp.get(k);
+    if (v) meta[k] = v;
+  }
+  // Server-side fallback for solo testing
+  if (!meta.contractorApiKey && process.env.INSTABID_CONTRACTOR_API_KEY) {
+    meta.contractorApiKey = process.env.INSTABID_CONTRACTOR_API_KEY;
+  }
+  return meta;
+}
+
+async function spawnAiParticipant(
+  baseUrl: string,
+  room: string,
+  meta: Record<string, string>,
+): Promise<void> {
   const url = `${baseUrl.replace(/\/$/, "")}/spawn`;
   const ctrl = new AbortController();
   const timeout = setTimeout(() => ctrl.abort(), 2_000);
@@ -90,7 +128,7 @@ async function spawnAiParticipant(baseUrl: string, room: string): Promise<void> 
     const res = await fetch(url, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ room }),
+      body: JSON.stringify({ room, meta }),
       signal: ctrl.signal,
     });
     if (!res.ok && res.status !== 200 && res.status !== 202) {
