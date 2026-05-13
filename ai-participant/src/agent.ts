@@ -16,7 +16,7 @@ import { mintBotToken } from "./token.js";
 import { connectGeminiLive, type GeminiSession, type FunctionCall } from "./gemini.js";
 import { lookupCountertopPrice } from "./tools/countertop-price.js";
 import { postObservation } from "./sinks/walk-session.js";
-import { postWalkSession, type RoomMetadata } from "./sinks/walk-session-post.js";
+import { postWalkSession, postEstimateForWalk, type RoomMetadata } from "./sinks/walk-session-post.js";
 import { pumpContractorVideo } from "./video.js";
 
 export type RunningAgent = {
@@ -65,7 +65,7 @@ export async function joinAsAgent(cfg: Config, roomName: string): Promise<Runnin
     audioChain = audioChain.then(() => publishAgentAudio(audioSource, pcm16, rate));
   });
   gemini.onFunctionCall(async (call) => {
-    await handleFunctionCall(cfg, roomName, gemini, call);
+    await handleFunctionCall(cfg, roomName, roomMeta, gemini, call);
   });
   gemini.onClose((code, reason) => {
     console.warn(`[gemini] closed code=${code} reason=${reason}`);
@@ -94,7 +94,10 @@ export async function joinAsAgent(cfg: Config, roomName: string): Promise<Runnin
     if (walkSessionPosted) return;
     walkSessionPosted = true;
     console.log(`[agent] firing walk-session post cause=${cause} room=${roomName}`);
-    await postWalkSession(cfg, roomName, roomMeta);
+    await Promise.allSettled([
+      postWalkSession(cfg, roomName, roomMeta),
+      postEstimateForWalk(cfg, roomName, roomMeta),
+    ]);
   };
 
   room.on(RoomEvent.Disconnected, () => {
@@ -122,9 +125,17 @@ function parseRoomMetadata(metadata: string | undefined): RoomMetadata {
       typeof parsed[k] === "string" ? (parsed[k] as string) : undefined;
     return {
       contractorId: pick("contractorId") ?? pick("contractor_id"),
+      contractorApiKey: pick("contractorApiKey") ?? pick("contractor_api_key") ?? pick("api_key"),
       homeownerId: pick("homeownerId") ?? pick("homeowner_id"),
       jobName: pick("jobName") ?? pick("job_name"),
       trade: pick("trade"),
+      customerName: pick("customerName") ?? pick("customer_name"),
+      customerEmail: pick("customerEmail") ?? pick("customer_email"),
+      customerPhone: pick("customerPhone") ?? pick("customer_phone"),
+      propertyAddress: pick("propertyAddress") ?? pick("address"),
+      city: pick("city"),
+      state: pick("state"),
+      zipCode: pick("zipCode") ?? pick("zip"),
     };
   } catch {
     return {};
@@ -179,6 +190,7 @@ function parseSampleRate(mimeType: string | undefined): number | undefined {
 async function handleFunctionCall(
   cfg: Config,
   roomName: string,
+  roomMeta: RoomMetadata,
   gemini: GeminiSession,
   call: FunctionCall,
 ): Promise<void> {
@@ -188,9 +200,12 @@ async function handleFunctionCall(
   let result: unknown;
   try {
     if (call.name === "lookup_countertop_price") {
+      const contractorApiKey =
+        roomMeta.contractorApiKey || cfg.INSTABID_CONTRACTOR_API_KEY;
       result = await lookupCountertopPrice(call.args, {
         url: cfg.INSTABID_PRICING_URL,
         key: cfg.INSTABID_PRICING_KEY,
+        contractorApiKey,
       });
     } else {
       result = { error: `unknown tool: ${call.name}` };

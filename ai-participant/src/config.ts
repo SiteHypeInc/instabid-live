@@ -12,6 +12,7 @@ const Schema = z.object({
   WALK_SESSION_POST_KEY: z.string().optional(),
   INSTABID_PRICING_URL: z.string().url().optional(),
   INSTABID_PRICING_KEY: z.string().optional(),
+  INSTABID_CONTRACTOR_API_KEY: z.string().optional(),
   PORT: z.coerce.number().int().positive().default(8787),
 });
 
