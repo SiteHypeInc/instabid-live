@@ -8,6 +8,8 @@ const Schema = z.object({
   GEMINI_MODEL: z.string().default("gemini-3.1-flash-live-preview"),
   RAILS_PRICING_API_URL: z.string().url().optional(),
   RAILS_PRICING_API_KEY: z.string().optional(),
+  WALK_SESSION_POST_URL: z.string().url().optional(),
+  WALK_SESSION_POST_KEY: z.string().optional(),
   PORT: z.coerce.number().int().positive().default(8787),
 });
 

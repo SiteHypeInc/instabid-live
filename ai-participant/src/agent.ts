@@ -16,6 +16,7 @@ import { mintBotToken } from "./token.js";
 import { connectGeminiLive, type GeminiSession, type FunctionCall } from "./gemini.js";
 import { lookupCountertopPrice } from "./tools/countertop-price.js";
 import { postObservation } from "./sinks/walk-session.js";
+import { postWalkSession, type RoomMetadata } from "./sinks/walk-session-post.js";
 import { pumpContractorVideo } from "./video.js";
 
 export type RunningAgent = {
@@ -35,6 +36,13 @@ export async function joinAsAgent(cfg: Config, roomName: string): Promise<Runnin
   const room = new Room();
   await room.connect(cfg.LIVEKIT_URL, token, { autoSubscribe: true, dynacast: true });
   console.log(`[agent] joined room=${roomName} as ${room.localParticipant?.identity}`);
+
+  const roomMeta = parseRoomMetadata(room.metadata);
+  if (roomMeta.contractorId || roomMeta.jobName) {
+    console.log(
+      `[agent] room metadata contractorId=${roomMeta.contractorId ?? "-"} job=${roomMeta.jobName ?? "-"} trade=${roomMeta.trade ?? "-"}`,
+    );
+  }
 
   const audioSource = new AudioSource(AGENT_SAMPLE_RATE, AGENT_CHANNELS, AGENT_AUDIO_QUEUE_MS);
   const localTrack = LocalAudioTrack.createAudioTrack("ai-voice", audioSource);
@@ -81,20 +89,46 @@ export async function joinAsAgent(cfg: Config, roomName: string): Promise<Runnin
     }
   });
 
+  let walkSessionPosted = false;
+  const fireWalkSessionPost = async (cause: string): Promise<void> => {
+    if (walkSessionPosted) return;
+    walkSessionPosted = true;
+    console.log(`[agent] firing walk-session post cause=${cause} room=${roomName}`);
+    await postWalkSession(cfg, roomName, roomMeta);
+  };
+
   room.on(RoomEvent.Disconnected, () => {
-    console.log(`[agent] room disconnected; closing gemini session`);
-    gemini.close();
+    console.log(`[agent] room disconnected; firing walk-session post then closing gemini`);
+    void fireWalkSessionPost("room_disconnected").finally(() => gemini.close());
   });
 
   return {
     room: roomName,
     async shutdown() {
+      await fireWalkSessionPost("shutdown");
       gemini.close();
       await audioSource.close().catch(() => undefined);
       await localTrack.close().catch(() => undefined);
       await room.disconnect();
     },
   };
+}
+
+function parseRoomMetadata(metadata: string | undefined): RoomMetadata {
+  if (!metadata) return {};
+  try {
+    const parsed = JSON.parse(metadata) as Record<string, unknown>;
+    const pick = (k: string): string | undefined =>
+      typeof parsed[k] === "string" ? (parsed[k] as string) : undefined;
+    return {
+      contractorId: pick("contractorId") ?? pick("contractor_id"),
+      homeownerId: pick("homeownerId") ?? pick("homeowner_id"),
+      jobName: pick("jobName") ?? pick("job_name"),
+      trade: pick("trade"),
+    };
+  } catch {
+    return {};
+  }
 }
 
 function parseRole(metadata: string | undefined): string | undefined {
