@@ -15,6 +15,20 @@ const server = createServer(async (req, res) => {
     return;
   }
 
+  if (req.method === "GET" && req.url === "/debug/lk") {
+    const target = cfg.LIVEKIT_URL.replace(/^wss:/, "https:").replace(/\/$/, "") + "/settings/regions";
+    try {
+      const r = await fetch(target);
+      const body = await r.text();
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ target, status: r.status, bodyHead: body.slice(0, 200) }));
+    } catch (err) {
+      res.writeHead(500, { "content-type": "application/json" });
+      res.end(JSON.stringify({ target, error: err instanceof Error ? err.message : String(err) }));
+    }
+    return;
+  }
+
   if (req.method === "GET" && req.url?.startsWith("/sessions/")) {
     const room = decodeURIComponent(req.url.slice("/sessions/".length));
     if (!ROOM_RE.test(room)) {
