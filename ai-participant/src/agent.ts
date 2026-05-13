@@ -114,12 +114,10 @@ async function pumpContractorAudio(track: RemoteTrack, gemini: GeminiSession): P
     const pcm16 = Buffer.from(frame.data.buffer, frame.data.byteOffset, frame.data.byteLength);
     gemini.send({
       realtimeInput: {
-        mediaChunks: [
-          {
-            mimeType: `audio/pcm;rate=${frame.sampleRate}`,
-            data: pcm16.toString("base64"),
-          },
-        ],
+        audio: {
+          mimeType: `audio/pcm;rate=${frame.sampleRate}`,
+          data: pcm16.toString("base64"),
+        },
       },
     });
   }
