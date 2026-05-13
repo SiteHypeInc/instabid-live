@@ -5,7 +5,7 @@ const Schema = z.object({
   LIVEKIT_API_SECRET: z.string().min(1),
   LIVEKIT_URL: z.string().url(),
   GEMINI_API_KEY: z.string().min(1),
-  GEMINI_MODEL: z.string().default("gemini-2.5-flash-native-audio-latest"),
+  GEMINI_MODEL: z.string().default("gemini-3.1-flash-live-preview"),
   RAILS_PRICING_API_URL: z.string().url().optional(),
   RAILS_PRICING_API_KEY: z.string().optional(),
   PORT: z.coerce.number().int().positive().default(8787),
