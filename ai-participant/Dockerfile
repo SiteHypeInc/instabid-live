@@ -13,6 +13,9 @@ FROM node:20-bookworm-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=8787
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends ca-certificates libssl3 \
+  && rm -rf /var/lib/apt/lists/*
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 COPY --from=build /app/dist ./dist
