@@ -1,7 +1,10 @@
-// Mocked pricing tool. Acceptance per TEA-685 says this is a "mocked HTTP responder
-// for now; swapped to real Rails endpoint once Jesse-side ticket lands". The mock
-// returns a believable quote keyed by material × ZIP-region so the smoke test
-// produces a stable answer.
+// Pricing tool. Lives in two modes:
+//   - HTTP mode: if INSTABID_PRICING_URL is set, POST {material, sqft, zip} and
+//     return the backend's JSON response unchanged (modulo a top-level
+//     {ok, source, ...backend-fields} envelope).
+//   - Mock mode (fallback): deterministic believable quote keyed by material ×
+//     ZIP-region. Used when the env is unset, when the backend errors, or when
+//     the response is malformed.
 import { z } from "zod";
 
 export const Material = z.enum([
@@ -63,8 +66,17 @@ function regionForZip(zip: string): Quote["region"] {
   return "W";
 }
 
-export function lookupCountertopPrice(raw: unknown): Quote {
-  const args = Args.parse(raw);
+export type PricingBackendConfig = {
+  url?: string;
+  key?: string;
+};
+
+export type PricingResult =
+  | ({ ok: true; source: "backend" } & Record<string, unknown>)
+  | ({ ok: true; source: "mock" } & Quote)
+  | ({ ok: true; source: "mock_fallback"; backend_error: string } & Quote);
+
+function mockQuote(args: Args): Quote {
   const region = regionForZip(args.zip);
   const mult = REGION_MULT[region];
   const matRate = MATERIAL_PER_SQFT_USD[args.material] * mult.material;
@@ -80,8 +92,47 @@ export function lookupCountertopPrice(raw: unknown): Quote {
     material_total_usd,
     labor_total_usd,
     total_usd,
-    notes: "Mocked quote (TEA-685). Real Rails pricing API pending Jesse-side ticket.",
+    notes: "Mocked quote (no live pricing backend configured).",
   };
+}
+
+export async function lookupCountertopPrice(
+  raw: unknown,
+  backend: PricingBackendConfig = {},
+): Promise<PricingResult> {
+  const args = Args.parse(raw);
+
+  if (!backend.url) {
+    return { ok: true, source: "mock", ...mockQuote(args) };
+  }
+
+  try {
+    const headers: Record<string, string> = { "content-type": "application/json" };
+    if (backend.key) headers.authorization = `Bearer ${backend.key}`;
+    const res = await fetch(backend.url, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(args),
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      return {
+        ok: true,
+        source: "mock_fallback",
+        backend_error: `status=${res.status} body=${body.slice(0, 200)}`,
+        ...mockQuote(args),
+      };
+    }
+    const json = (await res.json()) as Record<string, unknown>;
+    return { ok: true, source: "backend", ...json };
+  } catch (err) {
+    return {
+      ok: true,
+      source: "mock_fallback",
+      backend_error: err instanceof Error ? err.message : String(err),
+      ...mockQuote(args),
+    };
+  }
 }
 
 // Gemini Live function declaration. Schema fields use UPPERCASE types per the

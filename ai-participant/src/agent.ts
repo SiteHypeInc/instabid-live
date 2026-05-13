@@ -65,7 +65,7 @@ export async function joinAsAgent(cfg: Config, roomName: string): Promise<Runnin
     audioChain = audioChain.then(() => publishAgentAudio(audioSource, pcm16, rate));
   });
   gemini.onFunctionCall(async (call) => {
-    await handleFunctionCall(roomName, gemini, call);
+    await handleFunctionCall(cfg, roomName, gemini, call);
   });
   gemini.onClose((code, reason) => {
     console.warn(`[gemini] closed code=${code} reason=${reason}`);
@@ -177,6 +177,7 @@ function parseSampleRate(mimeType: string | undefined): number | undefined {
 }
 
 async function handleFunctionCall(
+  cfg: Config,
   roomName: string,
   gemini: GeminiSession,
   call: FunctionCall,
@@ -187,7 +188,10 @@ async function handleFunctionCall(
   let result: unknown;
   try {
     if (call.name === "lookup_countertop_price") {
-      result = lookupCountertopPrice(call.args);
+      result = await lookupCountertopPrice(call.args, {
+        url: cfg.INSTABID_PRICING_URL,
+        key: cfg.INSTABID_PRICING_KEY,
+      });
     } else {
       result = { error: `unknown tool: ${call.name}` };
     }
