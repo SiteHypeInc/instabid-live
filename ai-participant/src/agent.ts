@@ -22,8 +22,9 @@ export type RunningAgent = {
   shutdown(): Promise<void>;
 };
 
-// Gemini Live emits 24kHz mono PCM16 by default. AudioSource queue keeps a
-// short buffer so we don't underrun while bytes are still in flight.
+// Gemini Live emits PCM16; native-audio models advertise the rate in the
+// mimeType (e.g. audio/pcm;rate=24000). AudioSource queue keeps a short
+// buffer so we don't underrun while bytes are still in flight.
 const AGENT_SAMPLE_RATE = 24_000;
 const AGENT_CHANNELS = 1;
 const AGENT_AUDIO_QUEUE_MS = 200;
@@ -44,8 +45,15 @@ export async function joinAsAgent(cfg: Config, roomName: string): Promise<Runnin
   const gemini: GeminiSession = await connectGeminiLive(cfg);
   console.log("[agent] gemini live session open");
 
-  gemini.onAudio((pcm16) => {
-    void publishAgentAudio(audioSource, pcm16);
+  let audioChain: Promise<void> = Promise.resolve();
+  let firstAudioLogged = false;
+  gemini.onAudio((pcm16, mimeType) => {
+    const rate = parseSampleRate(mimeType) ?? AGENT_SAMPLE_RATE;
+    if (!firstAudioLogged) {
+      console.log(`[agent] first gemini audio mimeType=${mimeType} rate=${rate} bytes=${pcm16.length}`);
+      firstAudioLogged = true;
+    }
+    audioChain = audioChain.then(() => publishAgentAudio(audioSource, pcm16, rate));
   });
   gemini.onFunctionCall(async (call) => {
     await handleFunctionCall(roomName, gemini, call);
@@ -117,17 +125,24 @@ async function pumpContractorAudio(track: RemoteTrack, gemini: GeminiSession): P
   }
 }
 
-async function publishAgentAudio(source: AudioSource, pcm16: Buffer): Promise<void> {
-  // Gemini Live audio is little-endian PCM16. Wrap the bytes as Int16 without
-  // copying — alignment is already guaranteed by Buffer.from(base64) on a fresh
-  // allocation.
+async function publishAgentAudio(
+  source: AudioSource,
+  pcm16: Buffer,
+  sampleRate: number,
+): Promise<void> {
   const samples = new Int16Array(pcm16.buffer, pcm16.byteOffset, Math.floor(pcm16.byteLength / 2));
-  const frame = new AudioFrame(samples, AGENT_SAMPLE_RATE, AGENT_CHANNELS, samples.length);
+  const frame = new AudioFrame(samples, sampleRate, AGENT_CHANNELS, samples.length);
   try {
     await source.captureFrame(frame);
   } catch (err) {
     console.error("[agent] captureFrame failed", err);
   }
+}
+
+function parseSampleRate(mimeType: string | undefined): number | undefined {
+  if (!mimeType) return undefined;
+  const match = mimeType.match(/rate=(\d+)/);
+  return match ? Number(match[1]) : undefined;
 }
 
 async function handleFunctionCall(
