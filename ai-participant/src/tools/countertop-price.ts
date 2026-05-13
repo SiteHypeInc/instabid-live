@@ -1,7 +1,9 @@
 // Pricing tool. Lives in two modes:
-//   - HTTP mode: if INSTABID_PRICING_URL is set, POST {material, sqft, zip} and
-//     return the backend's JSON response unchanged (modulo a top-level
-//     {ok, source, ...backend-fields} envelope).
+//   - HTTP mode: if INSTABID_PRICING_URL is set, POST to instabid2's /api/estimate
+//     with quote_only=true so we get the real contractor-priced quote without
+//     persisting an estimate row or sending the customer email. The backend
+//     response is normalized into the same {material_total_usd, labor_total_usd,
+//     total_usd} shape as mock mode so the AI's response stays stable.
 //   - Mock mode (fallback): deterministic believable quote keyed by material ×
 //     ZIP-region. Used when the env is unset, when the backend errors, or when
 //     the response is malformed.
@@ -69,6 +71,7 @@ function regionForZip(zip: string): Quote["region"] {
 export type PricingBackendConfig = {
   url?: string;
   key?: string;
+  contractorApiKey?: string;
 };
 
 export type PricingResult =
@@ -96,23 +99,42 @@ function mockQuote(args: Args): Quote {
   };
 }
 
+type EstimateResponse = {
+  success?: boolean;
+  quote_only?: boolean;
+  estimate?: {
+    totalCost?: number;
+    materialCost?: number;
+    laborCost?: number;
+    totalWithTax?: number;
+  };
+};
+
 export async function lookupCountertopPrice(
   raw: unknown,
   backend: PricingBackendConfig = {},
 ): Promise<PricingResult> {
   const args = Args.parse(raw);
 
-  if (!backend.url) {
+  if (!backend.url || !backend.contractorApiKey) {
     return { ok: true, source: "mock", ...mockQuote(args) };
   }
 
   try {
     const headers: Record<string, string> = { "content-type": "application/json" };
     if (backend.key) headers.authorization = `Bearer ${backend.key}`;
+    const payload = {
+      api_key: backend.contractorApiKey,
+      quote_only: true,
+      trade: "countertops",
+      countertopType: args.material,
+      squareFeet: args.sqft,
+      zipCode: args.zip,
+    };
     const res = await fetch(backend.url, {
       method: "POST",
       headers,
-      body: JSON.stringify(args),
+      body: JSON.stringify(payload),
     });
     if (!res.ok) {
       const body = await res.text().catch(() => "");
@@ -123,8 +145,29 @@ export async function lookupCountertopPrice(
         ...mockQuote(args),
       };
     }
-    const json = (await res.json()) as Record<string, unknown>;
-    return { ok: true, source: "backend", ...json };
+    const json = (await res.json()) as EstimateResponse;
+    const est = json.estimate;
+    if (!est || typeof est.totalCost !== "number") {
+      return {
+        ok: true,
+        source: "mock_fallback",
+        backend_error: `unexpected response shape: ${JSON.stringify(json).slice(0, 200)}`,
+        ...mockQuote(args),
+      };
+    }
+    return {
+      ok: true,
+      source: "backend",
+      material: args.material,
+      sqft: args.sqft,
+      zip: args.zip,
+      material_total_usd: Math.round(est.materialCost ?? 0),
+      labor_total_usd: Math.round(est.laborCost ?? 0),
+      total_usd: Math.round(est.totalCost),
+      total_with_tax_usd:
+        typeof est.totalWithTax === "number" ? Math.round(est.totalWithTax) : undefined,
+      notes: "Live contractor-priced quote from instabid2 backend.",
+    };
   } catch (err) {
     return {
       ok: true,

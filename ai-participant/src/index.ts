@@ -55,8 +55,10 @@ const server = createServer(async (req, res) => {
       res.end(JSON.stringify({ status: "already_running", room }));
       return;
     }
+    const metaOverride =
+      body?.meta && typeof body.meta === "object" ? (body.meta as Record<string, unknown>) : undefined;
     try {
-      const agent = await joinAsAgent(cfg, room);
+      const agent = await joinAsAgent(cfg, room, metaOverride);
       agents.set(room, agent);
       res.writeHead(202, { "content-type": "application/json" });
       res.end(JSON.stringify({ status: "spawned", room }));
