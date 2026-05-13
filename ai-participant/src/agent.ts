@@ -16,6 +16,7 @@ import { mintBotToken } from "./token.js";
 import { connectGeminiLive, type GeminiSession, type FunctionCall } from "./gemini.js";
 import { lookupCountertopPrice } from "./tools/countertop-price.js";
 import { postObservation } from "./sinks/walk-session.js";
+import { pumpContractorVideo } from "./video.js";
 
 export type RunningAgent = {
   room: string;
@@ -76,9 +77,7 @@ export async function joinAsAgent(cfg: Config, roomName: string): Promise<Runnin
       void pumpContractorAudio(track, gemini);
     } else if (track.kind === TrackKind.KIND_VIDEO) {
       console.log(`[agent] subscribed video from contractor ${participant.identity}`);
-      // TODO(TEA-685.video): downsample to 1fps JPEGs and forward as inlineData mediaChunks.
-      // Deferred — needs a JPEG encoder dependency (sharp ~30MB native). Tool-call path
-      // (price quote) works without video.
+      void pumpContractorVideo(track, gemini);
     }
   });
 
