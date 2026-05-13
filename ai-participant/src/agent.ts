@@ -143,8 +143,15 @@ function parseRole(metadata: string | undefined): string | undefined {
 
 async function pumpContractorAudio(track: RemoteTrack, gemini: GeminiSession): Promise<void> {
   const stream = new AudioStream(track);
+  let firstFrameLogged = false;
   for await (const frame of stream) {
     const pcm16 = Buffer.from(frame.data.buffer, frame.data.byteOffset, frame.data.byteLength);
+    if (!firstFrameLogged) {
+      console.log(
+        `[agent] first contractor audio frame rate=${frame.sampleRate} channels=${frame.channels} bytes=${pcm16.length}`,
+      );
+      firstFrameLogged = true;
+    }
     gemini.send({
       realtimeInput: {
         audio: {
@@ -154,6 +161,7 @@ async function pumpContractorAudio(track: RemoteTrack, gemini: GeminiSession): P
       },
     });
   }
+  console.log("[agent] contractor audio stream ended");
 }
 
 async function publishAgentAudio(
