@@ -24,6 +24,7 @@ export const Args = z.object({
   material: Material,
   sqft: z.number().positive().max(2000),
   zip: z.string().regex(/^\d{5}$/),
+  state: z.string().regex(/^[A-Z]{2}$/).optional(),
 });
 export type Args = z.infer<typeof Args>;
 
@@ -108,11 +109,22 @@ export async function lookupCountertopPrice(
 
   try {
     const headers: Record<string, string> = { "content-type": "application/json" };
+    // instabid2 /api/estimate reads api_key from the body. The Bearer header
+    // is harmless but unused — kept for any future backend that wants it.
     if (backend.key) headers.authorization = `Bearer ${backend.key}`;
+    const payload: Record<string, unknown> = {
+      api_key: backend.key,
+      trade: "countertops",
+      material: args.material,
+      squareFeet: args.sqft,
+      zipCode: args.zip,
+      quote_only: true,
+    };
+    if (args.state) payload.state = args.state;
     const res = await fetch(backend.url, {
       method: "POST",
       headers,
-      body: JSON.stringify(args),
+      body: JSON.stringify(payload),
     });
     if (!res.ok) {
       const body = await res.text().catch(() => "");
@@ -156,6 +168,11 @@ export const FunctionDeclaration = {
       zip: {
         type: "STRING",
         description: "5-digit US ZIP code of the install location.",
+      },
+      state: {
+        type: "STRING",
+        description:
+          "Optional 2-letter US state code (e.g., 'TX', 'CA') for the install location. Improves regional labor-rate accuracy. Infer from ZIP if homeowner hasn't said it explicitly.",
       },
     },
     required: ["material", "sqft", "zip"],
