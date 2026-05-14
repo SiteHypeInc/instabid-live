@@ -51,35 +51,49 @@ export async function joinAsAgent(cfg: Config, roomName: string): Promise<Runnin
   await room.localParticipant!.publishTrack(localTrack, publishOpts);
   console.log(`[agent] published ai-voice track`);
 
-  const gemini: GeminiSession = await connectGeminiLive(cfg);
-  console.log("[agent] gemini live session open");
+  // Gemini Live sessions have a ~10min cap and emit `goAway` near the end.
+  // If we connect at /spawn time, the clock starts running before the
+  // contractor even joins. Defer the WS open until contractor audio is
+  // actually subscribed so the full session window covers the real walk.
+  let geminiPromise: Promise<GeminiSession> | undefined;
+  const ensureGemini = (): Promise<GeminiSession> => {
+    if (geminiPromise) return geminiPromise;
+    geminiPromise = (async () => {
+      console.log("[agent] opening gemini live session (lazy on contractor join)");
+      const g = await connectGeminiLive(cfg);
+      console.log("[agent] gemini live session open");
 
-  let audioChain: Promise<void> = Promise.resolve();
-  let firstAudioLogged = false;
-  gemini.onAudio((pcm16, mimeType) => {
-    const rate = parseSampleRate(mimeType) ?? AGENT_SAMPLE_RATE;
-    if (!firstAudioLogged) {
-      console.log(`[agent] first gemini audio mimeType=${mimeType} rate=${rate} bytes=${pcm16.length}`);
-      firstAudioLogged = true;
-    }
-    audioChain = audioChain.then(() => publishAgentAudio(audioSource, pcm16, rate));
-  });
-  gemini.onFunctionCall(async (call) => {
-    await handleFunctionCall(cfg, roomName, gemini, call);
-  });
-  gemini.onClose((code, reason) => {
-    console.warn(`[gemini] closed code=${code} reason=${reason}`);
-  });
-  if (process.env.LOG_GEMINI === "1") {
-    gemini.onMessage((msg) => console.log("[gemini]", JSON.stringify(msg).slice(0, 240)));
-  }
+      let audioChain: Promise<void> = Promise.resolve();
+      let firstAudioLogged = false;
+      g.onAudio((pcm16, mimeType) => {
+        const rate = parseSampleRate(mimeType) ?? AGENT_SAMPLE_RATE;
+        if (!firstAudioLogged) {
+          console.log(`[agent] first gemini audio mimeType=${mimeType} rate=${rate} bytes=${pcm16.length}`);
+          firstAudioLogged = true;
+        }
+        audioChain = audioChain.then(() => publishAgentAudio(audioSource, pcm16, rate));
+      });
+      g.onFunctionCall(async (call) => {
+        await handleFunctionCall(cfg, roomName, g, call);
+      });
+      g.onClose((code, reason) => {
+        console.warn(`[gemini] closed code=${code} reason=${reason}`);
+      });
+      if (process.env.LOG_GEMINI === "1") {
+        g.onMessage((msg) => console.log("[gemini]", JSON.stringify(msg).slice(0, 240)));
+      }
+      return g;
+    })();
+    return geminiPromise;
+  };
 
   let greeted = false;
-  const triggerGreeting = (): void => {
+  const triggerGreeting = async (): Promise<void> => {
     if (greeted) return;
     greeted = true;
+    const g = await ensureGemini();
     console.log("[agent] firing contractor-join greeting");
-    gemini.send({
+    g.send({
       clientContent: {
         turns: [
           {
@@ -104,11 +118,17 @@ export async function joinAsAgent(cfg: Config, roomName: string): Promise<Runnin
     }
     if (track.kind === TrackKind.KIND_AUDIO) {
       console.log(`[agent] subscribed audio from contractor ${participant.identity}`);
-      triggerGreeting();
-      void pumpContractorAudio(track, gemini);
+      void triggerGreeting();
+      void (async () => {
+        const g = await ensureGemini();
+        await pumpContractorAudio(track, g);
+      })();
     } else if (track.kind === TrackKind.KIND_VIDEO) {
       console.log(`[agent] subscribed video from contractor ${participant.identity}`);
-      void pumpContractorVideo(track, gemini);
+      void (async () => {
+        const g = await ensureGemini();
+        await pumpContractorVideo(track, g);
+      })();
     }
   });
 
@@ -120,16 +140,26 @@ export async function joinAsAgent(cfg: Config, roomName: string): Promise<Runnin
     await postWalkSession(cfg, roomName, roomMeta);
   };
 
+  const closeGeminiIfOpen = async (): Promise<void> => {
+    if (!geminiPromise) return;
+    try {
+      const g = await geminiPromise;
+      g.close();
+    } catch {
+      // ignore — never opened cleanly
+    }
+  };
+
   room.on(RoomEvent.Disconnected, () => {
     console.log(`[agent] room disconnected; firing walk-session post then closing gemini`);
-    void fireWalkSessionPost("room_disconnected").finally(() => gemini.close());
+    void fireWalkSessionPost("room_disconnected").finally(() => void closeGeminiIfOpen());
   });
 
   return {
     room: roomName,
     async shutdown() {
       await fireWalkSessionPost("shutdown");
-      gemini.close();
+      await closeGeminiIfOpen();
       await audioSource.close().catch(() => undefined);
       await localTrack.close().catch(() => undefined);
       await room.disconnect();
