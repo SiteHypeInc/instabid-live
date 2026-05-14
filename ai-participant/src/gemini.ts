@@ -95,25 +95,6 @@ export function connectGeminiLive(cfg: Config): Promise<GeminiSession> {
           },
         }),
       );
-      // Kick off an immediate greeting so the contractor hears the AI on join.
-      // Without this the silent-by-default prompt makes the room feel dead.
-      ws.send(
-        JSON.stringify({
-          clientContent: {
-            turns: [
-              {
-                role: "user",
-                parts: [
-                  {
-                    text: "(System note: A contractor just joined the InstaBid Live room. Say hello in one short sentence and remind them you can answer countertop pricing questions whenever they want a number.)",
-                  },
-                ],
-              },
-            ],
-            turnComplete: true,
-          },
-        }),
-      );
       resolve({
         send: (json) => ws.send(JSON.stringify(json)),
         sendToolResponse: (responses) => {

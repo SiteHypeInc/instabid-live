@@ -74,6 +74,28 @@ export async function joinAsAgent(cfg: Config, roomName: string): Promise<Runnin
     gemini.onMessage((msg) => console.log("[gemini]", JSON.stringify(msg).slice(0, 240)));
   }
 
+  let greeted = false;
+  const triggerGreeting = (): void => {
+    if (greeted) return;
+    greeted = true;
+    console.log("[agent] firing contractor-join greeting");
+    gemini.send({
+      clientContent: {
+        turns: [
+          {
+            role: "user",
+            parts: [
+              {
+                text: "(System note: A contractor just joined the InstaBid Live room. Say hello in one short sentence and remind them you can answer countertop pricing questions whenever they want a number.)",
+              },
+            ],
+          },
+        ],
+        turnComplete: true,
+      },
+    });
+  };
+
   room.on(RoomEvent.TrackSubscribed, (track: RemoteTrack, _pub, participant: RemoteParticipant) => {
     const role = parseRole(participant.metadata);
     if (role !== "contractor") {
@@ -82,6 +104,7 @@ export async function joinAsAgent(cfg: Config, roomName: string): Promise<Runnin
     }
     if (track.kind === TrackKind.KIND_AUDIO) {
       console.log(`[agent] subscribed audio from contractor ${participant.identity}`);
+      triggerGreeting();
       void pumpContractorAudio(track, gemini);
     } else if (track.kind === TrackKind.KIND_VIDEO) {
       console.log(`[agent] subscribed video from contractor ${participant.identity}`);
