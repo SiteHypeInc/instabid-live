@@ -8,7 +8,13 @@ import { join, resolve } from "node:path";
 export type Observation = {
   ts: string;
   room: string;
-  kind: "tool_call" | "tool_result" | "agent_speech" | "note";
+  kind:
+    | "tool_call"
+    | "tool_result"
+    | "agent_speech"
+    | "note"
+    | "transcript_user"
+    | "transcript_ai";
   payload: unknown;
 };
 

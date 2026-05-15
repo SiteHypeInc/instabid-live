@@ -14,12 +14,30 @@ export const Observation = z.object({
 });
 export type Observation = z.infer<typeof Observation>;
 
+export const Customer = z.object({
+  name: z.string().optional(),
+  email: z.string().optional(),
+  phone: z.string().optional(),
+  address: z.string().optional(),
+  city: z.string().optional(),
+  state: z.string().optional(),
+});
+export type Customer = z.infer<typeof Customer>;
+
+export const LastPricingCall = z.object({
+  args: z.record(z.unknown()),
+  result: z.unknown().optional(),
+});
+export type LastPricingCall = z.infer<typeof LastPricingCall>;
+
 export const GenerateRequest = z.object({
   sessionId: z.string().min(1),
   trade: z.literal("kitchen-countertops"),
   zip: z.string().regex(/^\d{5}$/),
-  transcript: z.array(TranscriptTurn).min(1),
+  transcript: z.array(TranscriptTurn).default([]),
   observations: z.array(Observation).default([]),
+  customer: Customer.optional(),
+  lastPricingCall: LastPricingCall.optional(),
   hardCase: z.boolean().default(false),
 });
 export type GenerateRequest = z.infer<typeof GenerateRequest>;

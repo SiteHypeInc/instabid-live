@@ -1,6 +1,7 @@
 import { createServer } from "node:http";
 import { loadConfig } from "./config.js";
 import { joinAsAgent, type RunningAgent } from "./agent.js";
+import type { RoomMetadata } from "./sinks/walk-session-post.js";
 import { readSession } from "./sinks/walk-session.js";
 
 const cfg = loadConfig();
@@ -56,7 +57,8 @@ const server = createServer(async (req, res) => {
       return;
     }
     try {
-      const agent = await joinAsAgent(cfg, room);
+      const meta = pickRoomMetadata(body);
+      const agent = await joinAsAgent(cfg, room, meta);
       agents.set(room, agent);
       res.writeHead(202, { "content-type": "application/json" });
       res.end(JSON.stringify({ status: "spawned", room }));
@@ -76,6 +78,27 @@ const server = createServer(async (req, res) => {
 server.listen(cfg.PORT, () => {
   console.log(`[ai-participant] listening on :${cfg.PORT}`);
 });
+
+function pickRoomMetadata(body: Record<string, unknown>): RoomMetadata {
+  const str = (k: string): string | undefined =>
+    typeof body[k] === "string" ? (body[k] as string) : undefined;
+  const customer = (body.customer ?? {}) as Record<string, unknown>;
+  const cstr = (k: string): string | undefined =>
+    typeof customer[k] === "string" ? (customer[k] as string) : undefined;
+  return {
+    contractorId: str("contractorId") ?? str("contractor_id"),
+    homeownerId: str("homeownerId") ?? str("homeowner_id"),
+    jobName: str("jobName") ?? str("job_name"),
+    trade: str("trade"),
+    customerName: str("customerName") ?? cstr("name"),
+    customerEmail: str("customerEmail") ?? cstr("email"),
+    customerPhone: str("customerPhone") ?? cstr("phone"),
+    address: str("address") ?? cstr("address"),
+    city: str("city") ?? cstr("city"),
+    state: str("state") ?? cstr("state"),
+    zip: str("zip") ?? str("zipCode") ?? cstr("zip") ?? cstr("zipCode"),
+  };
+}
 
 async function readJson(req: import("node:http").IncomingMessage): Promise<Record<string, unknown>> {
   const chunks: Buffer[] = [];

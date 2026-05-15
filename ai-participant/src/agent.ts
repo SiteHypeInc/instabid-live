@@ -31,13 +31,17 @@ const AGENT_SAMPLE_RATE = 24_000;
 const AGENT_CHANNELS = 1;
 const AGENT_AUDIO_QUEUE_MS = 200;
 
-export async function joinAsAgent(cfg: Config, roomName: string): Promise<RunningAgent> {
+export async function joinAsAgent(
+  cfg: Config,
+  roomName: string,
+  metaOverride: RoomMetadata = {},
+): Promise<RunningAgent> {
   const token = await mintBotToken(cfg, roomName);
   const room = new Room();
   await room.connect(cfg.LIVEKIT_URL, token, { autoSubscribe: true, dynacast: true });
   console.log(`[agent] joined room=${roomName} as ${room.localParticipant?.identity}`);
 
-  const roomMeta = parseRoomMetadata(room.metadata);
+  const roomMeta: RoomMetadata = { ...parseRoomMetadata(room.metadata), ...metaOverride };
   if (roomMeta.contractorId || roomMeta.jobName) {
     console.log(
       `[agent] room metadata contractorId=${roomMeta.contractorId ?? "-"} job=${roomMeta.jobName ?? "-"} trade=${roomMeta.trade ?? "-"}`,
@@ -78,6 +82,18 @@ export async function joinAsAgent(cfg: Config, roomName: string): Promise<Runnin
       });
       g.onClose((code, reason) => {
         console.warn(`[gemini] closed code=${code} reason=${reason}`);
+      });
+      g.onMessage((msg) => {
+        const sc = (msg as { serverContent?: { inputTranscription?: { text?: string }; outputTranscription?: { text?: string } } })
+          .serverContent;
+        const inText = sc?.inputTranscription?.text;
+        const outText = sc?.outputTranscription?.text;
+        if (inText && inText.trim()) {
+          void postObservation({ room: roomName, kind: "transcript_user", payload: { text: inText } });
+        }
+        if (outText && outText.trim()) {
+          void postObservation({ room: roomName, kind: "transcript_ai", payload: { text: outText } });
+        }
       });
       if (process.env.LOG_GEMINI === "1") {
         g.onMessage((msg) => console.log("[gemini]", JSON.stringify(msg).slice(0, 240)));
@@ -181,13 +197,25 @@ function parseRoomMetadata(metadata: string | undefined): RoomMetadata {
   if (!metadata) return {};
   try {
     const parsed = JSON.parse(metadata) as Record<string, unknown>;
-    const pick = (k: string): string | undefined =>
-      typeof parsed[k] === "string" ? (parsed[k] as string) : undefined;
+    const pick = (...keys: string[]): string | undefined => {
+      for (const k of keys) {
+        const v = parsed[k];
+        if (typeof v === "string") return v;
+      }
+      return undefined;
+    };
     return {
-      contractorId: pick("contractorId") ?? pick("contractor_id"),
-      homeownerId: pick("homeownerId") ?? pick("homeowner_id"),
-      jobName: pick("jobName") ?? pick("job_name"),
+      contractorId: pick("contractorId", "contractor_id"),
+      homeownerId: pick("homeownerId", "homeowner_id"),
+      jobName: pick("jobName", "job_name"),
       trade: pick("trade"),
+      customerName: pick("customerName", "customer_name"),
+      customerEmail: pick("customerEmail", "customer_email"),
+      customerPhone: pick("customerPhone", "customer_phone"),
+      address: pick("address", "propertyAddress", "property_address"),
+      city: pick("city"),
+      state: pick("state"),
+      zip: pick("zip", "zipCode", "zip_code"),
     };
   } catch {
     return {};
