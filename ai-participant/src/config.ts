@@ -12,6 +12,9 @@ const Schema = z.object({
   WALK_SESSION_POST_KEY: z.string().optional(),
   INSTABID_PRICING_URL: z.string().url().optional(),
   INSTABID_PRICING_KEY: z.string().optional(),
+  TAVILY_API_KEY: z.string().optional(),
+  OPENROUTER_API_KEY: z.string().optional(),
+  TIER3_TAVILY_MODEL: z.string().default("anthropic/claude-haiku-4.5"),
   PORT: z.coerce.number().int().positive().default(8787),
 });
 
