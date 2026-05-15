@@ -140,7 +140,7 @@ export async function generateEstimate(cfg: Config, req: GenerateRequest): Promi
       .join("")
       .trim();
 
-    return Estimate.parse(extractJson(text));
+    return Estimate.parse(coerceEstimate(extractJson(text)));
   }
 
   throw new Error(`estimate generation exceeded ${MAX_TOOL_ITERATIONS} tool-use iterations`);
@@ -150,4 +150,43 @@ function extractJson(text: string): unknown {
   const fence = text.match(/```(?:json)?\s*([\s\S]*?)```/);
   const raw = fence?.[1]?.trim() ?? text;
   return JSON.parse(raw);
+}
+
+// Newer Claude models sometimes emit `{text, evidence}` objects inside
+// assumptions[]/followUps[] and nest the estimate under an "estimate" key.
+// Normalize to the strict shape Zod expects before parsing.
+function coerceEstimate(input: unknown): unknown {
+  if (!input || typeof input !== "object") return input;
+  let obj = input as Record<string, unknown>;
+  if (
+    typeof obj.summary !== "string" &&
+    obj.estimate &&
+    typeof obj.estimate === "object"
+  ) {
+    obj = { ...(obj.estimate as Record<string, unknown>) };
+  }
+  if (Array.isArray(obj.assumptions)) {
+    obj.assumptions = obj.assumptions.map(flattenToString);
+  }
+  if (Array.isArray(obj.followUps)) {
+    obj.followUps = obj.followUps.map(flattenToString);
+  }
+  if (typeof obj.summary !== "string") {
+    obj.summary = flattenToString(obj.summary ?? obj.description ?? "");
+  }
+  return obj;
+}
+
+function flattenToString(item: unknown): string {
+  if (typeof item === "string") return item;
+  if (item && typeof item === "object") {
+    const o = item as Record<string, unknown>;
+    const text = o.text ?? o.description ?? o.statement ?? o.note ?? o.question;
+    if (typeof text === "string") {
+      const evidence = typeof o.evidence === "string" ? ` (evidence: ${o.evidence})` : "";
+      return text + evidence;
+    }
+    return JSON.stringify(item);
+  }
+  return item == null ? "" : String(item);
 }
