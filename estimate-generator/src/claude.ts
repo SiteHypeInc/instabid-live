@@ -23,7 +23,55 @@ Hard rules:
 3. Never invent SKUs. Use 'COUNTER-<MATERIAL>-<EDGE>' for stone slabs, 'LABOR-<TASK>' for labor lines, 'TEAROUT-<MATERIAL>' for tear-out, 'CUTOUT-<TYPE>' for cutouts.
 4. If the homeowner asked a question that wasn't fully answered on-call, surface it in 'followUps'.
 5. Round prices to whole dollars. unit and unitPrice must be USD; extended must equal quantity * unitPrice.
-6. Compute subtotal as the sum of extended values, and total as subtotal (no tax/discount line yet).`;
+6. Compute subtotal as the sum of extended values, and total as subtotal (no tax/discount line yet).
+7. Field types are STRICT. summary, every entry of assumptions, and every entry of followUps MUST be plain strings — never objects, never nested {text, evidence}. If you have evidence to attach, fold it into the same string in parentheses.`;
+
+const ESTIMATE_EXAMPLE_JSON = JSON.stringify(
+  {
+    sessionId: "ses_example",
+    trade: "kitchen-countertops",
+    zip: "78701",
+    summary:
+      "Replace 40 sqft of laminate with white quartz, eased edge, including tear-out, one undermount sink cutout, and one drop-in cooktop cutout.",
+    lineItems: [
+      {
+        sku: "COUNTER-QUARTZ-EASED",
+        description: "White quartz slab, eased edge",
+        quantity: 40,
+        unit: "sqft",
+        unitPrice: 50,
+        extended: 2000,
+      },
+      {
+        sku: "TEAROUT-LAMINATE",
+        description: "Tear-out and disposal of existing laminate tops",
+        quantity: 40,
+        unit: "sqft",
+        unitPrice: 8,
+        extended: 320,
+      },
+      {
+        sku: "CUTOUT-UNDERMOUNT",
+        description: "Undermount sink cutout, single bowl",
+        quantity: 1,
+        unit: "ea",
+        unitPrice: 150,
+        extended: 150,
+      },
+    ],
+    subtotal: 2470,
+    total: 2470,
+    assumptions: [
+      "Quartz unit price taken from in-call pricing tool (confirm before quoting).",
+      "Tear-out priced at $8/sqft based on observed laminate substrate condition.",
+    ],
+    followUps: [
+      "Confirm whether the existing tile backsplash will be retained (mentioned on call but not finalized).",
+    ],
+  },
+  null,
+  2,
+);
 
 export async function generateEstimate(cfg: Config, req: GenerateRequest): Promise<Estimate> {
   if (!cfg.ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY not set");
@@ -48,7 +96,12 @@ export async function generateEstimate(cfg: Config, req: GenerateRequest): Promi
         {
           type: "text",
           text:
-            "Walk-session payload follows. Use pricing_lookup as needed, then return a single JSON object matching the InstaBid Estimate schema in a ```json code fence.\n\n" +
+            "Return a single JSON object matching the InstaBid Estimate schema in a ```json code fence — same key names, same field types as the example below. Strings are strings; arrays of strings are arrays of strings. No objects inside assumptions[] or followUps[].\n\n" +
+            "Example output shape (values are illustrative, structure is mandatory):\n\n" +
+            "```json\n" +
+            ESTIMATE_EXAMPLE_JSON +
+            "\n```\n\n" +
+            "Walk-session payload to estimate from:\n\n" +
             "```json\n" +
             JSON.stringify(userPayload, null, 2) +
             "\n```",
