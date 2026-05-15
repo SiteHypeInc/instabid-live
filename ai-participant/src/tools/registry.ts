@@ -6,6 +6,8 @@ import { PaintingPriceTool } from "./painting-price.js";
 import { FlooringPriceTool } from "./flooring-price.js";
 import { HvacPriceTool } from "./hvac-price.js";
 import { RoofingPriceTool } from "./roofing-price.js";
+import { DrywallPriceTool } from "./drywall-price.js";
+import { SidingPriceTool } from "./siding-price.js";
 
 export const ALL_TOOLS: readonly Tool[] = [
   CountertopPriceTool,
@@ -15,6 +17,8 @@ export const ALL_TOOLS: readonly Tool[] = [
   FlooringPriceTool,
   HvacPriceTool,
   RoofingPriceTool,
+  DrywallPriceTool,
+  SidingPriceTool,
 ];
 
 export const TOOLS_BY_NAME: Readonly<Record<string, Tool>> = Object.fromEntries(
