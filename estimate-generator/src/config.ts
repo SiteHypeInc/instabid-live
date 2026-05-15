@@ -2,11 +2,14 @@ import { z } from "zod";
 
 const Schema = z.object({
   ANTHROPIC_API_KEY: z.string().optional(),
+  ANTHROPIC_BASE_URL: z.string().url().optional(),
   ANTHROPIC_MODEL_DEFAULT: z.string().default("claude-sonnet-4-6"),
   ANTHROPIC_MODEL_HARD: z.string().default("claude-opus-4-7"),
   RAILS_API_URL: z.string().url().optional(),
   RAILS_API_KEY: z.string().optional(),
-  ESTIMATE_SINK: z.enum(["local", "rails"]).optional(),
+  INSTABID_API_URL: z.string().url().optional(),
+  INSTABID_API_KEY: z.string().optional(),
+  ESTIMATE_SINK: z.enum(["local", "rails", "instabid"]).optional(),
   LOCAL_SINK_DIR: z.string().optional(),
   PORT: z.coerce.number().int().positive().default(8788),
 });

@@ -27,7 +27,10 @@ Hard rules:
 
 export async function generateEstimate(cfg: Config, req: GenerateRequest): Promise<Estimate> {
   if (!cfg.ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY not set");
-  const client = new Anthropic({ apiKey: cfg.ANTHROPIC_API_KEY });
+  const client = new Anthropic({
+    apiKey: cfg.ANTHROPIC_API_KEY,
+    ...(cfg.ANTHROPIC_BASE_URL ? { baseURL: cfg.ANTHROPIC_BASE_URL } : {}),
+  });
   const model = req.hardCase ? cfg.ANTHROPIC_MODEL_HARD : cfg.ANTHROPIC_MODEL_DEFAULT;
 
   const userPayload = {
