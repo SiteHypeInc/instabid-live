@@ -1,8 +1,29 @@
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import WebSocket from "ws";
 import type { Config } from "./config.js";
 import { ALL_TOOLS } from "./tools/registry.js";
 
-const SYSTEM_PROMPT = `You are InstaBid's senior estimator riding along on a contractor's job walk.
+const HERE = dirname(fileURLToPath(import.meta.url));
+
+function loadContractorWisdom(): string {
+  const candidates = [
+    join(HERE, "..", "prompts", "CONTRACTOR_WISDOM.md"),
+    join(HERE, "..", "..", "prompts", "CONTRACTOR_WISDOM.md"),
+    join(process.cwd(), "prompts", "CONTRACTOR_WISDOM.md"),
+  ];
+  for (const path of candidates) {
+    try {
+      return readFileSync(path, "utf8");
+    } catch {}
+  }
+  return "";
+}
+
+const CONTRACTOR_WISDOM = loadContractorWisdom();
+
+const BASE_PROMPT = `You are InstaBid's senior estimator riding along on a contractor's job walk.
 
 Behavior:
 - Watch the video silently. Speak only when something estimator-relevant appears in frame, when asked a direct question, or when the contractor explicitly asks you to.
@@ -39,6 +60,22 @@ Honesty rules (absolute):
 - NEVER claim a capability you don't have above. If unsure, decline rather than agree.
 
 You are not a constant narrator. Listen. Speak when it matters.`;
+
+const WISDOM_PREAMBLE = `## Contractor Playbook
+
+You have access to a curated playbook of trigger → question → cost-impact entries below. This is 30 years of contractor wisdom — the questions a senior contractor would ask but a homeowner would never think of. Apply it like a senior estimator would, not like a script:
+
+- Don't recite it. Don't rapid-fire questions. Work them into conversation naturally, one topic at a time, after the person you're talking to has finished a thought.
+- Match triggers contextually. The TRIGGER line tells you when the entry is relevant — only ask the ASK if the trigger actually fires (something appears in frame, the homeowner brings it up, the project scope intersects).
+- Don't ask what you can already see. If the cabinet style is visible, don't ask about cabinet style — observe it.
+- When an entry's COST IMPACT is concrete (a dollar number or range), share it immediately so the customer isn't left guessing. If a tool can quote it precisely, call the tool.
+- Treat asbestos / lead-paint / pre-1980 entries as hard prerequisites: surface them before quoting, not after.
+
+`;
+
+const SYSTEM_PROMPT = CONTRACTOR_WISDOM
+  ? `${BASE_PROMPT}\n\n${WISDOM_PREAMBLE}${CONTRACTOR_WISDOM}`
+  : BASE_PROMPT;
 
 export type FunctionCall = {
   id?: string;
