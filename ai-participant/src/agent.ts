@@ -150,6 +150,16 @@ export async function joinAsAgent(cfg: Config, roomName: string): Promise<Runnin
     }
   };
 
+  // When the contractor leaves, the call is over — tear the room down so
+  // the disconnect chain fires the walk-session post and the estimate
+  // generator picks up the conversation.
+  room.on(RoomEvent.ParticipantDisconnected, (participant: RemoteParticipant) => {
+    const role = parseRole(participant.metadata);
+    if (role !== "contractor") return;
+    console.log(`[agent] contractor ${participant.identity} left — disconnecting room to fire post-call chain`);
+    void room.disconnect();
+  });
+
   room.on(RoomEvent.Disconnected, () => {
     console.log(`[agent] room disconnected; firing walk-session post then closing gemini`);
     void fireWalkSessionPost("room_disconnected").finally(() => void closeGeminiIfOpen());
