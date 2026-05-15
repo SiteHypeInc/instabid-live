@@ -6,6 +6,7 @@
 //     ZIP-region. Used when the env is unset, when the backend errors, or when
 //     the response is malformed.
 import { z } from "zod";
+import type { Tool } from "./_shared.js";
 
 export const Material = z.enum([
   "laminate",
@@ -178,3 +179,8 @@ export const FunctionDeclaration = {
     required: ["material", "sqft", "zip"],
   },
 } as const;
+
+export const CountertopPriceTool: Tool = {
+  declaration: FunctionDeclaration,
+  handle: (raw, backend) => lookupCountertopPrice(raw, backend),
+};

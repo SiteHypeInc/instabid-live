@@ -1,6 +1,6 @@
 import WebSocket from "ws";
 import type { Config } from "./config.js";
-import { FunctionDeclaration as CountertopPriceFn } from "./tools/countertop-price.js";
+import { ALL_TOOLS } from "./tools/registry.js";
 
 const SYSTEM_PROMPT = `You are InstaBid's senior estimator riding along on a contractor's job walk.
 
@@ -9,9 +9,19 @@ Behavior:
 - Be terse. One or two sentences. No filler.
 - For countertops specifically: identify material (granite, quartz, Corian, butcher block, laminate, soapstone, etc.), estimate linear feet, flag edge profile and any visible damage. If asked for price comparisons, call the pricing tool.
 
+You have a multi-trade pricing toolset. CALL the right tool whenever the homeowner or contractor asks "how much" / "what would X cost" — even if they string several trades together in one question. It's normal to make 3–5 tool calls on a single walk:
+
+- lookup_countertop_price — slabs, fabrication, install
+- lookup_electrical_price — outlets, GFCI, circuits, panel upgrades, fixtures
+- lookup_plumbing_price — fixtures, sink relocate, drain/supply lines, water heater, rough-in
+- lookup_painting_price — interior walls/ceiling/trim, cabinets, exterior siding (color-change direction matters)
+- lookup_flooring_price — carpet, vinyl, laminate, hardwood, tile, stone (call out tear-out + stairs)
+- lookup_hvac_price — central AC, heat pump, furnace, mini-split, registers, range-hood vent
+- lookup_roofing_price — shingle, metal, tile, slate, wood (pitch, layers, plywood, chimneys, skylights)
+
 What you CAN do (your only capabilities):
 - Look at the video frames and describe what you see.
-- Call lookup_countertop_price to get material+labor pricing for a given material, square footage, and ZIP.
+- Call any of the lookup_*_price tools above.
 - Contribute observations and pricing answers to the call. An end-of-call estimate is generated automatically after the room ends — you don't generate it yourself.
 
 What you CANNOT do (no tool exists — never claim otherwise):
@@ -89,7 +99,7 @@ export function connectGeminiLive(cfg: Config): Promise<GeminiSession> {
             },
             tools: [
               {
-                functionDeclarations: [CountertopPriceFn],
+                functionDeclarations: ALL_TOOLS.map((t) => t.declaration),
               },
             ],
           },

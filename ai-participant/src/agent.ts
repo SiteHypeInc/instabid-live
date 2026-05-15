@@ -14,7 +14,7 @@ import {
 import type { Config } from "./config.js";
 import { mintBotToken } from "./token.js";
 import { connectGeminiLive, type GeminiSession, type FunctionCall } from "./gemini.js";
-import { lookupCountertopPrice } from "./tools/countertop-price.js";
+import { TOOLS_BY_NAME } from "./tools/registry.js";
 import { postObservation } from "./sinks/walk-session.js";
 import { postWalkSession, type RoomMetadata } from "./sinks/walk-session-post.js";
 import { pumpContractorVideo } from "./video.js";
@@ -286,13 +286,14 @@ async function handleFunctionCall(
 
   let result: unknown;
   try {
-    if (call.name === "lookup_countertop_price") {
-      result = await lookupCountertopPrice(call.args, {
+    const tool = TOOLS_BY_NAME[call.name];
+    if (!tool) {
+      result = { error: `unknown tool: ${call.name}` };
+    } else {
+      result = await tool.handle(call.args, {
         url: cfg.INSTABID_PRICING_URL,
         key: cfg.INSTABID_PRICING_KEY,
       });
-    } else {
-      result = { error: `unknown tool: ${call.name}` };
     }
   } catch (err) {
     result = { error: err instanceof Error ? err.message : String(err) };

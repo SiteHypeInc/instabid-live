@@ -27,6 +27,12 @@ type ReshapedObservation = {
   confidence?: number;
 };
 
+export type PricingCall = {
+  tool: string;
+  args: Record<string, unknown>;
+  result: unknown;
+};
+
 export type WalkSessionPayload = {
   sessionId: string;
   room: string;
@@ -52,6 +58,10 @@ export type WalkSessionPayload = {
     args: Record<string, unknown>;
     result: unknown;
   };
+  // Every pricing call the AI made on the call, in order. Multi-trade walks
+  // produce one entry per tool invocation — estimate-generator turns each
+  // into its own line/estimate downstream.
+  pricingCalls: PricingCall[];
   rawObservations: Observation[];
 };
 
@@ -67,10 +77,12 @@ export async function postWalkSession(
 
   const transcript = buildTranscript(observations);
   const reshaped = reshapeObservations(observations);
-  const lastPricingCall = findLastPricingCall(observations);
+  const pricingCalls = collectPricingCalls(observations);
+  const lastPricingCall = pricingCalls[pricingCalls.length - 1];
   const zip =
     meta.zip ??
     (typeof lastPricingCall?.args.zip === "string" ? (lastPricingCall.args.zip as string) : undefined) ??
+    (typeof lastPricingCall?.args.zipCode === "string" ? (lastPricingCall.args.zipCode as string) : undefined) ??
     DEFAULT_ZIP;
 
   const payload: WalkSessionPayload = {
@@ -96,6 +108,7 @@ export async function postWalkSession(
     transcript,
     observations: reshaped,
     lastPricingCall,
+    pricingCalls,
     rawObservations: observations,
   };
 
@@ -164,36 +177,54 @@ function mergeAdjacent(turns: TranscriptTurn[]): TranscriptTurn[] {
 function reshapeObservations(observations: Observation[]): ReshapedObservation[] {
   const out: ReshapedObservation[] = [];
   for (const obs of observations) {
-    if (obs.kind === "tool_call") {
-      const args = (obs.payload as { args?: Record<string, unknown> })?.args ?? {};
-      const material = typeof args.material === "string" ? args.material : undefined;
-      const sqft = typeof args.sqft === "number" ? args.sqft : undefined;
-      if (material) out.push({ kind: "material", text: `material=${material}` });
-      if (sqft !== undefined) out.push({ kind: "dimension", text: `sqft=${sqft}` });
-    }
+    if (obs.kind !== "tool_call") continue;
+    const p = obs.payload as { name?: string; args?: Record<string, unknown> };
+    const args = p?.args ?? {};
+    const tool = p?.name ?? "";
+    const tradeTag = tool.replace(/^lookup_/, "").replace(/_price$/, "");
+    const tag = tradeTag ? `[${tradeTag}] ` : "";
+    const pickStr = (k: string): string | undefined => (typeof args[k] === "string" ? (args[k] as string) : undefined);
+    const pickNum = (k: string): number | undefined => (typeof args[k] === "number" ? (args[k] as number) : undefined);
+    const material = pickStr("material") ?? pickStr("flooringType");
+    const surface = pickStr("surface");
+    const scope = pickStr("scope");
+    const systemType = pickStr("systemType");
+    if (material) out.push({ kind: "material", text: `${tag}material=${material}` });
+    if (surface) out.push({ kind: "fixture", text: `${tag}surface=${surface}` });
+    if (scope) out.push({ kind: "fixture", text: `${tag}scope=${scope}` });
+    if (systemType) out.push({ kind: "fixture", text: `${tag}systemType=${systemType}` });
+    const sqft = pickNum("sqft") ?? pickNum("squareFeet") ?? pickNum("paintArea");
+    const lf = pickNum("linearFeet");
+    const count = pickNum("count") ?? pickNum("units") ?? pickNum("fixtures");
+    if (sqft !== undefined) out.push({ kind: "dimension", text: `${tag}sqft=${sqft}` });
+    if (lf !== undefined) out.push({ kind: "dimension", text: `${tag}linearFeet=${lf}` });
+    if (count !== undefined) out.push({ kind: "dimension", text: `${tag}count=${count}` });
   }
   return out;
 }
 
-function findLastPricingCall(
-  observations: Observation[],
-): { args: Record<string, unknown>; result: unknown } | undefined {
-  let lastCall: Record<string, unknown> | undefined;
-  let lastResult: unknown;
+// Walk through observations in order and pair each pricing tool_call with
+// its matching tool_result by tool name + position. Returns one PricingCall
+// per invocation across all trades, oldest first.
+function collectPricingCalls(observations: Observation[]): PricingCall[] {
+  const out: PricingCall[] = [];
   for (const obs of observations) {
     if (obs.kind === "tool_call") {
       const p = obs.payload as { name?: string; args?: Record<string, unknown> };
-      if (p?.name === "lookup_countertop_price") {
-        lastCall = p.args ?? {};
-        lastResult = undefined;
-      }
+      if (!p?.name?.startsWith("lookup_")) continue;
+      out.push({ tool: p.name, args: p.args ?? {}, result: undefined });
     } else if (obs.kind === "tool_result") {
       const p = obs.payload as { name?: string; result?: unknown };
-      if (p?.name === "lookup_countertop_price") {
-        lastResult = p.result;
+      if (!p?.name?.startsWith("lookup_")) continue;
+      // Pair with the most recent unresolved call of the same tool name.
+      for (let i = out.length - 1; i >= 0; i -= 1) {
+        const candidate = out[i];
+        if (candidate && candidate.tool === p.name && candidate.result === undefined) {
+          candidate.result = p.result;
+          break;
+        }
       }
     }
   }
-  if (!lastCall) return undefined;
-  return { args: lastCall, result: lastResult };
+  return out;
 }

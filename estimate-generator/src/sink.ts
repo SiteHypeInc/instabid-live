@@ -2,15 +2,35 @@ import { mkdirSync, writeFileSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Config } from "./config.js";
-import type { Estimate, GenerateRequest } from "./types.js";
+import type { Estimate, GenerateRequest, PricingCall } from "./types.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_LOCAL_SINK_DIR = join(HERE, "..", "local-sink");
 
+export type InstabidPostResult = {
+  trade: string;
+  tool: string;
+  status: number;
+  ok: boolean;
+  body: string;
+  payload: Record<string, unknown>;
+};
+
 export type SinkResult =
   | { sink: "rails"; status: number; ok: boolean; body: string }
   | { sink: "instabid"; status: number; ok: boolean; body: string; payload: Record<string, unknown> }
+  | { sink: "instabid_multi"; results: InstabidPostResult[] }
   | { sink: "local"; file: string };
+
+const TOOL_TO_TRADE: Record<string, string> = {
+  lookup_countertop_price: "countertops",
+  lookup_electrical_price: "electrical",
+  lookup_plumbing_price: "plumbing",
+  lookup_painting_price: "painting",
+  lookup_flooring_price: "flooring",
+  lookup_hvac_price: "hvac",
+  lookup_roofing_price: "roofing",
+};
 
 function pickSink(cfg: Config): "rails" | "local" | "instabid" {
   if (cfg.ESTIMATE_SINK === "local") return "local";
@@ -45,6 +65,24 @@ export async function postEstimate(
   if (sink === "instabid") {
     if (!cfg.INSTABID_API_URL) throw new Error("INSTABID_API_URL required when ESTIMATE_SINK=instabid");
     if (!cfg.INSTABID_API_KEY) throw new Error("INSTABID_API_KEY required when ESTIMATE_SINK=instabid");
+
+    const calls = req?.pricingCalls ?? [];
+    if (calls.length > 1) {
+      const results: InstabidPostResult[] = [];
+      for (const call of calls) {
+        const trade = TOOL_TO_TRADE[call.tool] ?? "countertops";
+        const payload = buildInstabidPayloadFromCall(cfg.INSTABID_API_KEY, trade, call, estimate, req);
+        const res = await fetch(cfg.INSTABID_API_URL, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const body = await res.text();
+        results.push({ trade, tool: call.tool, status: res.status, ok: res.ok, body, payload });
+      }
+      return { sink: "instabid_multi", results };
+    }
+
     const payload = buildInstabidPayload(cfg.INSTABID_API_KEY, estimate, req);
     const res = await fetch(cfg.INSTABID_API_URL, {
       method: "POST",
@@ -121,4 +159,48 @@ function extractMaterialFromEstimate(estimate: Estimate): string | undefined {
   if (!slab) return undefined;
   const parts = slab.sku.split("-");
   return parts[1]?.toLowerCase();
+}
+
+// Multi-trade variant: builds the instabid2 payload from a single pricing
+// call (tool + args) instead of the aggregated Estimate. The call's args
+// already carry trade-specific fields (material, scope, surface, systemType,
+// etc.) — forward them verbatim alongside customer/api_key envelope.
+function buildInstabidPayloadFromCall(
+  apiKey: string,
+  trade: string,
+  call: PricingCall,
+  estimate: Estimate,
+  req?: GenerateRequest,
+): Record<string, unknown> {
+  const customer = req?.customer ?? {};
+  const args = call.args;
+  const zip =
+    pickString(args.zip) ?? pickString(args.zipCode) ?? estimate.zip;
+
+  const out: Record<string, unknown> = {
+    api_key: apiKey,
+    trade,
+    customerName: customer.name ?? "InstaBid Live Customer",
+    customerEmail: customer.email,
+    customerPhone: customer.phone,
+    propertyAddress: customer.address,
+    city: customer.city,
+    state: customer.state,
+    zipCode: zip,
+    sessionId: estimate.sessionId,
+    summary: `${trade} estimate from InstaBid Live walk-session`,
+  };
+
+  for (const [k, v] of Object.entries(args)) {
+    if (out[k] !== undefined) continue;
+    // Normalize legacy short keys to instabid2's canonical names.
+    if (k === "sqft") {
+      if (out.squareFeet === undefined) out.squareFeet = v;
+      continue;
+    }
+    if (k === "zip") continue; // already mapped to zipCode
+    out[k] = v;
+  }
+
+  return out;
 }
