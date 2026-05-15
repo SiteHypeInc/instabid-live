@@ -30,6 +30,13 @@ export const LastPricingCall = z.object({
 });
 export type LastPricingCall = z.infer<typeof LastPricingCall>;
 
+export const PricingCall = z.object({
+  tool: z.string(),
+  args: z.record(z.unknown()),
+  result: z.unknown().optional(),
+});
+export type PricingCall = z.infer<typeof PricingCall>;
+
 export const GenerateRequest = z.object({
   sessionId: z.string().min(1),
   trade: z.literal("kitchen-countertops"),
@@ -38,6 +45,7 @@ export const GenerateRequest = z.object({
   observations: z.array(Observation).default([]),
   customer: Customer.optional(),
   lastPricingCall: LastPricingCall.optional(),
+  pricingCalls: z.array(PricingCall).default([]),
   hardCase: z.boolean().default(false),
 });
 export type GenerateRequest = z.infer<typeof GenerateRequest>;
