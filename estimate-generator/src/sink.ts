@@ -30,6 +30,8 @@ const TOOL_TO_TRADE: Record<string, string> = {
   lookup_flooring_price: "flooring",
   lookup_hvac_price: "hvac",
   lookup_roofing_price: "roofing",
+  lookup_drywall_price: "drywall",
+  lookup_siding_price: "siding",
 };
 
 function pickSink(cfg: Config): "rails" | "local" | "instabid" {
