@@ -18,7 +18,6 @@ export const Args = z.object({
   units: z.number().int().positive().max(8).default(1),
   zip: z.string().regex(/^\d{5}$/),
   efficiency: z.enum(["standard", "high", "premium"]).default("standard"),
-  ventType: z.enum(["recirculating", "exterior_vented"]).optional(),
 });
 export type Args = z.infer<typeof Args>;
 
@@ -61,7 +60,6 @@ function mockQuote(args: Args) {
     zip: args.zip,
     region,
     efficiency: args.efficiency,
-    ventType: args.ventType,
     material_total_usd,
     labor_total_usd,
     total_usd: material_total_usd + labor_total_usd,
@@ -81,7 +79,6 @@ export async function lookupHvacPrice(raw: unknown, backend: { url?: string; key
       efficiency: args.efficiency,
       ...(args.tonnage !== undefined ? { tonnage: args.tonnage } : {}),
       ...(args.squareFeet !== undefined ? { squareFeet: args.squareFeet } : {}),
-      ...(args.ventType ? { ventType: args.ventType } : {}),
     },
     mock,
     "Mocked HVAC quote (no live pricing backend configured).",
@@ -91,7 +88,8 @@ export async function lookupHvacPrice(raw: unknown, backend: { url?: string; key
 export const FunctionDeclaration = {
   name: "lookup_hvac_price",
   description:
-    "Get pricing for HVAC: central AC, heat pump, furnace, mini-split, register adds, duct repair. For range hood / kitchen vent questions, use ventType to capture recirculating vs exterior_vented.",
+    "Get pricing for HVAC: central AC, heat pump, furnace, mini-split, register adds, duct repair. " +
+    "Do NOT use this for range hoods or kitchen vent fans — call lookup_range_hood_price instead.",
   parameters: {
     type: "OBJECT" as const,
     properties: {
@@ -104,11 +102,6 @@ export const FunctionDeclaration = {
         type: "STRING",
         description: "Equipment efficiency tier.",
         enum: ["standard", "high", "premium"],
-      },
-      ventType: {
-        type: "STRING",
-        description: "For range/kitchen vents: recirculating vs exterior_vented (ductwork through wall/roof).",
-        enum: ["recirculating", "exterior_vented"],
       },
     },
     required: ["systemType", "zip"],

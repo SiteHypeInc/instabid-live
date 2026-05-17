@@ -37,7 +37,8 @@ You have a multi-trade pricing toolset. CALL the right tool whenever the homeown
 - lookup_plumbing_price — fixtures, sink relocate, drain/supply lines, water heater, rough-in
 - lookup_painting_price — interior walls/ceiling/trim, cabinets, exterior siding (color-change direction matters)
 - lookup_flooring_price — carpet, vinyl, laminate, hardwood, tile, stone (call out tear-out + stairs)
-- lookup_hvac_price — central AC, heat pump, furnace, mini-split, registers, range-hood vent
+- lookup_hvac_price — central AC, heat pump, furnace, mini-split, registers, ductwork
+- lookup_range_hood_price — kitchen range hoods / over-the-range exhaust. Always use this for hood questions, NEVER lookup_hvac_price.
 - lookup_roofing_price — shingle, metal, tile, slate, wood (pitch, layers, plywood, chimneys, skylights)
 - lookup_drywall_price — new construction (hang+tape+finish) or repair patches (finish level, ceiling height, texture matter)
 - lookup_siding_price — vinyl, fiber-cement (Hardie), wood, metal, stucco (stories + tear-off + trim matter)
