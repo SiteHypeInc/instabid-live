@@ -1,4 +1,5 @@
 import type { Tool } from "./_shared.js";
+import { CabinetPriceTool } from "./cabinet-price.js";
 import { CountertopPriceTool } from "./countertop-price.js";
 import { ElectricalPriceTool } from "./electrical-price.js";
 import { PlumbingPriceTool } from "./plumbing-price.js";
@@ -11,6 +12,7 @@ import { SidingPriceTool } from "./siding-price.js";
 import { UnknownMaterialPriceTool } from "./unknown-material-price.js";
 
 export const ALL_TOOLS: readonly Tool[] = [
+  CabinetPriceTool,
   CountertopPriceTool,
   ElectricalPriceTool,
   PlumbingPriceTool,
