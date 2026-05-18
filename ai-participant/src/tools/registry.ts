@@ -6,6 +6,7 @@ import { PlumbingPriceTool } from "./plumbing-price.js";
 import { PaintingPriceTool } from "./painting-price.js";
 import { FlooringPriceTool } from "./flooring-price.js";
 import { HvacPriceTool } from "./hvac-price.js";
+import { RangeHoodPriceTool } from "./range-hood-price.js";
 import { RoofingPriceTool } from "./roofing-price.js";
 import { DrywallPriceTool } from "./drywall-price.js";
 import { SidingPriceTool } from "./siding-price.js";
@@ -19,6 +20,7 @@ export const ALL_TOOLS: readonly Tool[] = [
   PaintingPriceTool,
   FlooringPriceTool,
   HvacPriceTool,
+  RangeHoodPriceTool,
   RoofingPriceTool,
   DrywallPriceTool,
   SidingPriceTool,
